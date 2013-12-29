@@ -99,6 +99,8 @@ if (!class_exists("FACAdminMeta"))
 		function save_custom_meta($post_id) {
 			//global $custom_meta_fields;
 			global $post;
+			
+			if(isset($post)) {
 		
 			if( metadata_exists('post', $post->ID, 'stock_id' ) ) {			
 		
@@ -128,6 +130,8 @@ if (!class_exists("FACAdminMeta"))
 						delete_post_meta($post_id, $field['id'], $old);
 					}
 				} // end foreach
+			}
+			
 			}
 		}
 		function custom_meta_fields() {

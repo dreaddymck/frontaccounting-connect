@@ -12,7 +12,7 @@ Import active Frontaccounting items into wordpress as posts.
 
 == Description ==
 
-A simple plugin for importing Frontaccounting items into wordpress posts. 
+A simple plugin that can be used to import Frontaccounting product items into wordpress posts. 
 Support widget to display imported items in sidebar
 Shortcode support.
 
@@ -43,7 +43,7 @@ Customize templates if needed.
 
 = Does this plugin support real-time pricing and quantities =
 
-Not at the moment.
+Not at the moment. Manual updates required if FrontAccounting items change
  
 = Where does this plugin store imported Frontaccount items data =
 
@@ -55,10 +55,16 @@ na
 
 == Changelog ==
 
+=1.0.1=
+fixed - image import error
+fixed - associating image with post
+added - jQuery UI progress bar
+
+
 =1.0=
 no change - initial product release
 
 == Upgrade Notice ==
-
+na
 
 == Arbitrary section ==

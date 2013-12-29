@@ -158,7 +158,7 @@ if (!class_exists("FAConnectItems"))
 			return $url."/".$this->options["fac_prod_img_folder"]."/".$id.".jpg";
 		}
 		function get_shortdesc() {	
-			return $this->results['description'];		
+			return $this->results['description'];		
 		}
 		function get_longdesc() {
 			return $this->results['long_description'];
@@ -245,6 +245,55 @@ if (!class_exists("FAConnectItems"))
 			$this->pg = $pg;
 		}
 	
+		function fa_get_total()
+		{
+			//Connect to the frontaccounting database
+			//
+		
+			$obj	= new FAConnectDB($this->options);
+			$fadb 	= $obj->dbObj();
+		
+			$limit 	= $this->options['fac_itemperpage'];
+			$co		= $this->options['fac_dbtblpref'];	// Frontaccounting company id
+			$page 	= $this->pg;
+		
+				
+			if( $page > 1 ) {	$start 	= ($page - 1) * $limit; //first item to display on this page
+			}else{	$start = 0; }
+				
+			$sql = <<<EOF
+SELECT COUNT(DISTINCT sm.stock_id)
+FROM
+	mgadmin_frontaccounting.%d_stock_master sm
+LEFT JOIN
+	mgadmin_frontaccounting.%d_stock_moves smo
+ON
+	smo.stock_id = sm.stock_id
+LEFT JOIN
+	mgadmin_frontaccounting.%d_stock_category scat
+ON
+	scat.category_id = sm.category_id
+LEFT JOIN
+	mgadmin_frontaccounting.%d_purch_order_details pod
+ON
+	pod.item_code = sm.stock_id
+LEFT JOIN
+	mgadmin_frontaccounting.%d_prices pr
+ON
+	pr.stock_id = sm.stock_id
+	AND
+	pr.sales_type_id = 1
+WHERE
+	sm.inactive = 0
+AND
+	sm.no_sale = 0
+AND
+	( sm.material_cost > 0 OR pr.price > 0 )
+		
+EOF;
+		
+			$this->total = $fadb->get_var( $fadb->prepare($sql, $co, $co, $co, $co, $co) );
+		}
 /*
 *
 * all items
@@ -255,7 +304,7 @@ if (!class_exists("FAConnectItems"))
 			//Connect to the frontaccounting database
 			//
 
-			$obj	= new FAConnectDB(&$this->options);
+			$obj	= new FAConnectDB($this->options);
 			$fadb 	= $obj->dbObj();
 
 			$limit 	= $this->options['fac_itemperpage'];

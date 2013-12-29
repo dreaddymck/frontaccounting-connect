@@ -1,6 +1,18 @@
+<?php //wp_enqueue_style( 'jquery-ui.css', 'http://code.jquery.com/ui/1.10.3/themes/smoothness/jquery-ui.css' ); ?>
+<?php //wp_register_script( 'jquery-ui.js', 'http://code.jquery.com/ui/1.10.3/jquery-ui.js', array(), '1.10.3', true ); ?>
+<?php //wp_enqueue_script( 'jquery-ui.js'); ?>
+
+<script src="http://code.jquery.com/ui/1.10.3/jquery-ui.js"></script>
+<style type="text/css">
+  	@import url("http://code.jquery.com/ui/1.10.3/themes/smoothness/jquery-ui.css");
+</style>
+
 <script language="javascript" >
 
+var myurl = "<?php echo str_replace( '%7E', '~', $_SERVER['REQUEST_URI']); ?>"
+
 jQuery(document).ready(function() {
+	
 	jQuery('#fac-main-import-btn').click( function() {
 		jQuery('#main').hide('fast', function(){
 			jQuery('#main-import').show('fast');
@@ -14,27 +26,62 @@ jQuery(document).ready(function() {
 	jQuery('#fac-main').click( function() {
 		jQuery('#main-import').hide('fast', function() {
 			jQuery('#main').show('fast');
-			});
+		});
 		jQuery('#update-settings').css('background', '#FFFF00').delay(500).queue(function(d) {
 			jQuery(this).css('background', '');
 			jQuery(this).dequeue();
 	    });
  	});	
  	jQuery('#import-to-posts-btn').click(function() {
+ 	 	
  		jQuery('#fac-debug').text('Processing'); 
+
+ 		jQuery(".resetProgressBar").resetProgressBar(  );
  		
  		jQuery.ajax({
  			  type: "POST",
- 			  url: "<?php echo str_replace( '%7E', '~', $_SERVER['REQUEST_URI']); ?>",
- 			  data: { update: "yes" }
- 			}).done(function( msg ) {
-<?php if(WP_DEBUG == true):?>
- 			  	jQuery('#fac-debug').text( msg );
-<?php else: ?>
-				jQuery('#fac-debug').text( "\nFinished\n" );
-<?php endif;?>
+ 			  url: myurl,
+ 			  data: { totalpage: true }
+ 			}).done(function( msg ) {  	 							 
+ 				jQuery(".processItems").processItems( msg );
  			});		
  	});
+
+ 	jQuery.fn.processItems = function (msg) { 		
+ 		
+ 		obj = jQuery.parseJSON( msg );
+
+ 		jQuery("body").css("cursor", "progress");
+        jQuery("#progressbar").progressbar({max: obj.total});
+        jQuery("#progressbar").progressbar({value: obj.current}); 		
+
+ 		if( jQuery.isNumeric(obj.total) && jQuery.isNumeric(obj.current)  ) {
+
+			if( obj.total >= obj.current ) {
+
+	 	 		jQuery.ajax({
+	 	 			  type: "POST",
+	 	 			  url: myurl,
+	 	 			  data: { processpage: true, page: obj.current, total: obj.total  }
+
+	 	 			}).done(function( msg ) {
+	 	 				jQuery(".processItems").processItems( msg );
+ 	 	 			});
+				}else{
+						jQuery("body").css("cursor", "auto");
+ 		        		jQuery("#progressbar").progressbar({disabled: true});	
+	 		         	jQuery("#fac-debug").text("Processing finished."); 
+				} 			
+ 		}
+ 	 		
+ 	}; 
+ 	jQuery.fn.resetProgressBar = function() {
+ 	 	
+ 		jQuery("#progressbar" ).progressbar({disabled: false});
+ 		jQuery("#progressbar").progressbar({max: 100});
+ 		jQuery("#progressbar").progressbar({value: 0}); 
+ 	};	
+ 	
 });
 	
 </script>	
@@ -271,13 +318,15 @@ jQuery(document).ready(function() {
 		</div>
 	
 	</div>
+	
 	<div id="main-import" style="display:none;">
 		
 		<button id="import-to-posts-btn" class="button">click to start</button>
 		<p>
-		Sync FrontAccounting products to Wordpress post: 
+			Sync FrontAccounting products to Wordpress post:<br>
 		</p>
-		<p>
+		<p>			
+			<div id="progressbar" style=""></div>
 			<pre id="fac-debug"></pre>
 		</p>
 	</div>

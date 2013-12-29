@@ -24,6 +24,18 @@ if( !function_exists( 'add_action' ) ) {
 	exit;
 }
 
+if (!function_exists('write_log')) {
+	function write_log ( $log )  {
+		if ( true === WP_DEBUG ) {
+			if ( is_array( $log ) || is_object( $log ) ) {
+				error_log( print_r( $log, true ) );
+			} else {
+				error_log( $log );
+			}
+		}
+	}
+}
+
 define( 'PLUGIN_PATH', plugin_dir_path(__FILE__) );
 
 require_once ( PLUGIN_PATH.'FAConnectdb.php');
@@ -48,35 +60,32 @@ if (!class_exists("FAConnect")) {
 		
 		function __construct() {
 			
-			$post = isset( $_POST ) ? $_POST : null;	
-			
-			if( isset( $post['update'] ) ){
-				
-				add_action('wp_default_scripts', array(&$this, 'import_to_post'));
-				
-			}else{
-			
-				add_action('admin_menu', array(&$this, 'admin_menu'));			
-				add_action('add_admin_bar_menus', array(&$this, 'fac_admin_bar_render'));
-				add_action('add_meta_boxes', array(&$this, 'add_custom_meta_box'));
-				add_action('save_post', array(&$this,'save_custom_meta'));
-				
-				add_filter('the_content', array(&$this, 'append_to_fac_post'));
-				
-				//add_filter('the_excerpt', array(&$this, 'append_to_fac_post'));
-				//add_filter('wp_footer', array(&$this, 'append_to_fac_post'));
-	
-				//add_action('wp_head', array(&$this, 'buffer_start'));
-				//add_action('wp_footer', array(&$this, 'buffer_end'));	
+			$post = isset( $_POST ) ? $_POST : null;
 
+			//write_log('FACconnect construct: '.json_encode($post));
+			
+			if( isset( $post['update'] ) ){				
+				add_action('wp_default_scripts', array($this, 'import_to_post'));				
 			}
-
-		}
-
-		
-
-		
-		
+			else
+			if(isset( $post['totalpage'] )){
+				add_action('wp_default_scripts', array($this, 'import_total'));
+			}
+			else
+			if(isset( $post['processpage'] )){
+				add_action('wp_default_scripts', array($this, 'import_process'));
+			}
+			else{			
+				add_action('admin_menu', array($this, 'admin_menu'));			
+				add_action('add_admin_bar_menus', array($this, 'fac_admin_bar_render'));
+				add_action('add_meta_boxes', array($this, 'add_custom_meta_box'));
+				
+				add_action('save_post', array($this,'save_custom_meta'));
+				
+				add_filter('the_content', array($this, 'append_to_fac_post'));
+			}
+	
+		}		
 		/*
 		 * admin menu
 		 */
@@ -84,8 +93,8 @@ if (!class_exists("FAConnect")) {
 			add_options_page('Frontaccounting Connect settings','FaC','manage_options','fac_settings', array($this, 'admin_settings'));			
 			global $wp_version;
 			if ( version_compare($wp_version, '2.7', '>=' ) ) {
-				//add_filter( 'plugin_action_links_' . plugin_basename(__FILE__), array(&$this, 'admin_action_link') );
-				add_filter( 'plugin_action_links_' . plugin_basename(__FILE__), array(&$this, 'readme') );
+				//add_filter( 'plugin_action_links_' . plugin_basename(__FILE__), array($this, 'admin_action_link') );
+				add_filter( 'plugin_action_links_' . plugin_basename(__FILE__), array($this, 'readme') );
 			}	// Add link "Settings" to the plugin in /wp-admin/plugins.php		
 		}
 		
@@ -216,23 +225,33 @@ if (!class_exists("FAConnect")) {
 		 * import posts routine
 		*/
 		function import_to_post() {
-			$obj = new FACImportPost();
+			$obj 	= new FACImportPost();
 			$obj->handlePostImport();
-			exit;
+			exit();
 		}
-		
-		
+		function import_total() {
+			$obj 	= new FACImportPost();
+			$obj->getPagingInfo();
+			exit();
+		}		
+		function import_process() {
+			
+			$post 	= isset( $_POST ) ? $_POST : null;
+			$obj 	= new FACImportPost();
+			$obj->processInfoByPage( $post['page'], $post['total'] );
+			exit();
+		}		
 		
 		/* admin custom Meta Box
 		 *
 		*/
 		function add_custom_meta_box() {			
-			$obj = new FACAdminMeta();			
+			$obj 	= new FACAdminMeta();			
 			$obj->add_custom_meta_box();
 		}		
 		// Save the admin custom meta box data
 		function save_custom_meta($post_id) {
-			$obj = new FACAdminMeta();				
+			$obj 	= new FACAdminMeta();				
 			$obj->save_custom_meta($post_id);
 		}
 		
@@ -261,7 +280,7 @@ if (!class_exists("FAConnect")) {
 						'stock_id' 		=> null,
 						'results'		=> null,
 						'page'			=> null,
-						
+						'total'			=> null,
 					), $atts));
 			
 			$out 	= null;
@@ -273,9 +292,7 @@ if (!class_exists("FAConnect")) {
 				$stock_id = isset( $_POST['stock_id'] ) ? $_POST['stock_id'] : null;
 			}
 						
-			$options['stock_id'] = $stock_id;		
-			
-			
+			$options['stock_id'] = $stock_id;
 	
 			if( $stock_id )
 			{				
@@ -333,7 +350,7 @@ if (!class_exists("FAConnect")) {
 			if($results) 
 			{
 			
-				$obj = new FAConnectItems( &$options );
+				$obj = new FAConnectItems( $options );
 				
 				if($page) 
 				{
@@ -351,13 +368,35 @@ if (!class_exists("FAConnect")) {
 				wp_reset_query();
 				
 			}
+			else
+			if($total)
+			{					
+				$obj = new FAConnectItems( $options );
 			
+				if($page)
+				{
+					$obj->override_pg($page);
+				}
+				$obj->fa_get_total();
+			
+				/* object shared between
+				 * FACImportPost, FAConnectItems
+				*/
+				$this->itemObj = $obj;
+			
+				$out = ($obj->results);
+			
+				wp_reset_query();
+				
+				return null;
+			}			
 			return $out;
 		}
 		
 	}
 	new FAConnect;		
-	add_shortcode( 'fac', array('FAConnect', 'items_handler') );
+	add_shortcode( 'fac', array('FAConnect', 'items_handler') );	
+	
 }
 
 

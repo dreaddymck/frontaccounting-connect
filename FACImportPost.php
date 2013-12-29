@@ -22,73 +22,77 @@ if (!class_exists("FACImportPost")) {
 		
 		function __construct() {}
 		
-		function handlePostImport() {
-	
+		function getPagingInfo(){
+			
+			//header("Content-type: text/xml");				
+			//echo chr(60).chr(63).'xml version="1.0" encoding="utf-8" '.chr(63).chr(62);
+			//echo '<xmlresponse>';
+			//echo '<debug><![CDATA[';			
+			
+			$obj 	= new FAConnect();
+			
+			$results 	= $obj->items_handler( array('total' => 'true') );
+
+			$pagetot	= ceil($obj->itemObj->total / $obj->itemObj->options['fac_itemperpage']);
+			
+			$currpage	= $obj->itemObj->pg;
+			
+			
+			//echo ']]></debug>';			
+			
+			//echo '<total>'.$pagetot.'</total>';
+			//echo '<current>'.$currpage.'</current>';			
+
+			$array		= array( 'total'=> $pagetot,'current'=> $currpage );
+			
+			wp_reset_postdata();
+						
+			//echo '</xmlresponse>';
+			
+			echo json_encode($array);
+			
+		}
+		function processInfoByPage($page, $total){
+			
+			//header("Content-type: text/xml");
+			
+			//echo chr(60).chr(63).'xml version="1.0" encoding="utf-8" '.chr(63).chr(62);
+			//echo '<xmlresponse>';
+			//echo '<debug><![CDATA[';			
+			
 			$this->obj 	= new FAConnect();
-						
-			$results 	= $this->obj->items_handler( array('results' => 'true') );
 			
-			$this->options	= $this->obj->itemObj->options;
+			$this->options	= get_option('fac_options');
 			
-			$pagetot	= ceil($this->obj->itemObj->total / $this->options['fac_itemperpage']);
-			
-			$currpage	= $this->obj->itemObj->pg;
-			
-			echo "Total items to process: ".$this->obj->itemObj->total."\n";		
-			echo "*\n";
-						
-			$this->process(&$results);
-			
-			
-			if($pagetot > 1) {
-				
-			
-				do{
-					
-					$currpage++;
-				
-					$results 	= $this->obj->items_handler( 
-															array(
-																'results' => 'true', 
-																'page' => $currpage,
-																) 
-															);
-					
-					echo "*\n";
-					
-					$this->process(&$results);
-					
-					/*
-					 * just in case
-					 * 
-					 */
-					
-					if($currpage > 99999) {
-						exit();
-					}
-					
-				} while ($currpage < $pagetot ); 
-				
-				//var_dump($this->options);
-				
+			$results 	= $this->obj->items_handler(
+								array( 'results' => 'true',	'page' => $page,)
+							);	
 
-				
+			$this->process($results);
 			
-			}
-			update_option('fac_options', $this->options);
+			$page = $page + 1;
 			
-			echo "Finished\n";	
+			//echo ']]></debug>';
+			
+			//echo '<total>'.$total.'</total>';
+			//echo '<current>'.$page.'</current>';
+			
+			$array		= array( 'total' => $total, 'current'=> $page );
 
-			// Restore original Post Data
 			wp_reset_postdata();
 
+			//echo '</xmlresponse>';
+			
+			echo json_encode($array);
+				
+		}	
+
 		
-		}
 		function process($results) {
 			
 			foreach ($results as $value)
 			{			
-			
+								
 				$terms 		= $this->obj->itemObj->get_category_desc( $value["category_id"] );				
 				$taxonomy	= 'category';
 				
@@ -100,8 +104,6 @@ if (!class_exists("FACImportPost")) {
 				
 				}
 				
-				//echo  "TERM ID".$wpterm['term_id']."\n";
-			
 				$post = array(
 						'post_title'    => $value['description'],
 						'post_content'  => $value['long_description'],
@@ -140,17 +142,9 @@ if (!class_exists("FACImportPost")) {
 				/* add permalink to storage for further use.
 				*/
 				$this->options['permalink'][ $value['stock_id'] ] = get_permalink($post_id);				
-				
-				//echo "debug: ".get_permalink($post_id)."\n";
-				
+			
 				$attachments = get_children( array('post_parent' => $post_id, 'post_type' => 'attachment', 'post_mime_type' => 'image') );				
 
-/*debug
- * *
- */	
-//var_dump($attachments);
-//exit;			
-				
 				if ( $attachments ) {
 					
 					foreach ( $attachments as $attachment ) 
@@ -159,13 +153,6 @@ if (!class_exists("FACImportPost")) {
 					}					
 						
 				}				
-
-				
-/*debug
- * *
-*/
-//var_dump($attachments);
-//exit;				
 				
 				wp_set_post_terms( $post_id, $wpterm , $taxonomy );
 								
@@ -191,35 +178,15 @@ if (!class_exists("FACImportPost")) {
 					
 				}				
 
-				
-				
-//var_dump( $tmpimgsrc );
-								
-				
-				
+												
 				$imgsrc = $this->side_load_attachemt( $tmpimgsrc, $post_id, $value['description']) ;
-				
-				
-//var_dump( $imgsrc );
-				
-				
 				
 				$this->set_wp_featured_image($imgsrc, $post_id, $post_meta_method);
 				
 				$post_meta_method( $post_id, "image", $imgsrc );
 
-				$price = $this->obj->itemObj->price(&$value);
-				
-/*
-var_dump ( $value['stock_id'] );
-var_dump ( $value['price'] );
-var_dump ( $value['std_cost_unit'] );
-var_dump ( $value['actual_cost'] );
-var_dump ( $value['material_cost'] );
-var_dump ( is_array($price)) ;
-var_dump ( $price );
-*/			
-				
+				$price = $this->obj->itemObj->price($value);
+								
 				if( $price ) 
 				{
 					if( is_array($price) ) 
@@ -235,16 +202,6 @@ var_dump ( $price );
 						
 							$innerprice = $price[$i];
 							
-							//do this before finish innerprice
-							//							
-							/*if( ! $value['price'] ) {															
-								$inner_pri_w_tax	= $this->obj->itemObj->addtax($innerprice);															
-							}*/
-							
-							/*var_dump ( $value['material_cost'] );
-							var_dump ( $value['labour_cost'] );
-							var_dump ( $value['overhead_cost'] );*/
-							
 							$innerprice	= $this->obj->itemObj->round_to_nearest( $innerprice );
 							$inner_pri_w_tax = money_format('%i', $innerprice);
 							
@@ -255,12 +212,8 @@ var_dump ( $price );
 							$post_meta_method($post_id, 'sales_type', $sales_type_row['sales_type'] );
 							$post_meta_method($post_id, 'price', number_format( $innerprice, 2) );
 							$post_meta_method($post_id, 'price_with_tax', number_format( $inner_pri_w_tax, 2 ) );
-							$post_meta_method($post_id, 'tax_exempt', $this->obj->itemObj->tax_exempt_status(&$value['tax_type_id']) );
-							
-							/*echo "<pre>";
-							var_dump($this->obj->itemObj->tax_exempt_status(&$value['tax_type_id']));
-							echo "</pre>";
-							*/
+							$post_meta_method($post_id, 'tax_exempt', $this->obj->itemObj->tax_exempt_status($value['tax_type_id']) );
+
 						}					
 					}
 					else
@@ -278,12 +231,6 @@ var_dump ( $price );
 								
 								$innerprice	= $price * $factor;
 								$inner_pri_w_tax	= ($innerprice);
-						
-								//do this before finish innerprice
-								//
-								/*if( ! $value['price'] ) {
-									$inner_pri_w_tax	= $this->obj->itemObj->addtax($innerprice);
-								}*/
 								
 								$inner_pri_w_tax	= $this->obj->itemObj->round_to_nearest( $inner_pri_w_tax );
 								$inner_pri_w_tax 	= number_format( $inner_pri_w_tax, 2) ;
@@ -295,25 +242,16 @@ var_dump ( $price );
 								$post_meta_method($post_id, 'sales_type', $row['sales_type'] );
 								$post_meta_method($post_id, 'price', $innerprice );
 								$post_meta_method($post_id, 'price_with_tax', $inner_pri_w_tax );
-								$post_meta_method($post_id, 'tax_exempt', $this->obj->itemObj->tax_exempt_status(&$value['tax_type_id']) );
-								
-								/*
-								echo "<pre>";
-								var_dump($this->obj->itemObj->tax_exempt_status(&$value['tax_type_id']));
-								echo "</pre>";								
-								*/
+								$post_meta_method($post_id, 'tax_exempt', $this->obj->itemObj->tax_exempt_status($value['tax_type_id']) );
+
 							}
 						}								
 					}					
-				}		
-
+				}
+				//var_dump( $this->obj->itemObj->price($value) );
 				
-				//var_dump( $this->obj->itemObj->price(&$value) );
-			
 			}			
-			
-			//echo( $post_id );			
-
+			//echo( $post_id );
 		}
 		function getExistingPostObj($id) {
 		
@@ -335,7 +273,7 @@ var_dump ( $price );
 		
 		}	
 		function side_load_attachemt($url, $post_id, $desc) {
-
+			
 			//$url = "http://s.wordpress.org/style/images/wp3-logo.png";
 			$tmp = download_url( $url );
 
@@ -351,15 +289,9 @@ var_dump ( $price );
 				@unlink($file_array['tmp_name']);
 				$file_array['tmp_name'] = '';
 			}
-			
 
-//var_dump ( $file_array );
-
-
-
-					
 			// do the validation and storage stuff
-			$id = media_handle_sideload( $file_array, $post_id, $desc );
+			$id = @media_handle_sideload( $file_array, $post_id, $desc );
 			
 			// If error storing permanently, unlink
 			if ( is_wp_error($id) ) {
@@ -370,30 +302,61 @@ var_dump ( $price );
 			@unlink($file_array['tmp_name']);
 			
 			$src = wp_get_attachment_url( $id );
-						
+									
 			return $src;
 		}
-		function set_wp_featured_image($filename, $post_id, $post_meta_method)
+		function set_wp_featured_image($fileurl, $post_id, $post_meta_method)
 		{
-			$wp_filetype = wp_check_filetype($filename, null);
+			$fname = basename($fileurl);
+		
+			//write_log('File name: '.$fname);
+			
+			$uploaddir = wp_upload_dir();
+			
+			//write_log('Upload dir: '.$uploaddir['path']);
+			
+			$uploadfile = $uploaddir['path'] . '/' . $fname;
+			
+			//write_log('Upload file: '.$uploadfile);
+			
+			$contents= file_get_contents($fileurl);
+			
+			$savefile = fopen($uploadfile, 'w');
+			
+			fwrite($savefile, $contents);
+			
+			fclose($savefile);
+			
+			
+			$wp_filetype = wp_check_filetype($fname, null);
 			$attachment = array(
 					'post_mime_type' => $wp_filetype['type'],
-					'post_title' => $filename,
+					'post_title' => $fname,
 					'post_content' => '',
 					'post_status' => 'inherit'
 			);
-		
-			$attach_id = wp_insert_attachment( $attachment, $filename, $post_id );
+			
+			//write_log( "Processing start insert attachement...".time() );
+			$attach_id = wp_insert_attachment( $attachment, $uploadfile, $post_id );
+			
 			// you must first include the image.php file
 			// for the function wp_generate_attachment_metadata() to work
 			//require_once(ABSPATH . 'wp-admin/includes/image.php');
-			$attach_data = wp_generate_attachment_metadata( $attach_id, $filename );
+			//write_log( "Processing start generate attachment...".time() );
+			$attach_data = wp_generate_attachment_metadata( $attach_id, $uploadfile );
+			
+			//write_log( "Processing start update meta...".time() );
 			wp_update_attachment_metadata( $attach_id, $attach_data );
 		
 			// add featured image to post
-			//add_post_meta($post_id, '_thumbnail_id', $attach_id);
+			//write_log( "Processing start add post...".time() );
+			add_post_meta($post_id, '_thumbnail_id', $attach_id);
+			
+			//write_log( "Processing start post method...".time() );
 			$post_meta_method($post_id, '_thumbnail_id', $attach_id);
-		
+			
+			//write_log( "Processing end set featured...".time() );
+			
 		}
 		/*
 		function tax_exempt_status($tax_id) {
