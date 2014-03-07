@@ -86,7 +86,7 @@ if (!class_exists("FAConnectAdmin")) {
 		}
 		public function get_company_options() {		
 		
-			$obj	= new FAConnectDB(&$this->options);			
+			$obj	= new FAConnectDB($this->options);			
 			$fadb 	= $obj->dbObj();
 			$co		= isset( $this->options['fac_dbtblpref']) ? $this->options['fac_dbtblpref'] : 0;
 

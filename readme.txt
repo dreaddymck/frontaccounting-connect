@@ -3,7 +3,7 @@ Contributors: dreaddymck
 Donate Link: https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=6NA7CLSRP6FMW&lc=US&item_name=Mckenzie%27s%20Touch&item_number=FAC&currency_code=USD&bn=PP%2dDonationsBF%3abtn_donate_SM%2egif%3aNonHosted
 Tags: frontaccounting, erp, plugin, widget
 Requires at least: 3.0.1
-Tested up to: 3.4
+Tested up to: 3.8.1
 Stable tag: 4.3
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
@@ -54,6 +54,9 @@ The item short description will be stored as post content. Everything else is st
 na
 
 == Changelog ==
+
+=1.0.1.1=
+fixed - pass by reference error
 
 =1.0.1=
 fixed - image import error
